@@ -1,4 +1,6 @@
 import prisma from "@/app/lib/prisma";
+import { getUserSessionServer } from "@/auth/actions/auth-actions";
+import { Todo } from "@prisma/client";
 import { NextResponse, NextRequest } from "next/server";
 import * as yup from "yup";
 
@@ -8,15 +10,24 @@ interface Segments {
   };
 }
 
+const getTodo = async (id: string): Promise<Todo | null> => {
+  const user = await getUserSessionServer();
+
+  if (!user) return null;
+
+  const todo = await prisma.todo.findFirst({ where: { id } });
+
+  if (todo?.userId !== user.id) return null;
+
+  return todo;
+};
+
 export async function GET(request: Request, { params }: Segments) {
-  const { id } = params;
-  const todo = await prisma.todo.findFirst({
-    where: { id },
-  });
+  const todo = await getTodo(params.id);
 
   if (!todo) {
     return NextResponse.json(
-      { message: `No se ha encontrado ningun TODO con id ${id}.` },
+      { message: `No se ha encontrado ningun TODO con id ${params.id}.` },
       { status: 404 }
     );
   }
@@ -30,14 +41,11 @@ const putSchema = yup.object({
 });
 
 export async function PUT(request: Request, { params }: Segments) {
-  const { id } = params;
-  const todo = await prisma.todo.findFirst({
-    where: { id },
-  });
+  const todo = await getTodo(params.id);
 
   if (!todo) {
     return NextResponse.json(
-      { message: `No se ha encontrado ningun TODO con id ${id}.` },
+      { message: `No se ha encontrado ningun TODO con id ${params.id}.` },
       { status: 404 }
     );
   }
@@ -48,7 +56,7 @@ export async function PUT(request: Request, { params }: Segments) {
     );
 
     const updatedTodo = await prisma.todo.update({
-      where: { id },
+      where: { id: params.id },
       data: { complete, description },
     });
 
